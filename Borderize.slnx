@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Borderize.csproj" />
+  <Project Path="Borderize.Tests/Borderize.Tests.csproj" />
+</Solution>
