@@ -1,0 +1,10 @@
+bin/
+obj/
+**/bin/
+**/obj/
+nupkg/
+.git/
+.github/
+.claude/
+**/.DS_Store
+*.user

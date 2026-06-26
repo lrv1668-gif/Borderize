@@ -24,9 +24,15 @@ dotnet tool install --global --add-source ./nupkg borderize
 
 # Run the test suite
 dotnet test
+
+# Build + run tests in Docker (exactly what CI does)
+docker build --target test .
+
+# Compile-only stage (no tests)
+docker build --target build .
 ```
 
-Tests live in `Borderize.Tests/` (xUnit) and cover `InputResolver`, `OptionParsing`, and `BorderProcessor.ComputeBorders`/`BuildOutputPath`/`OrientUpright`. EXIF-orientation fixtures are synthesized in-process with `ExifLibNet` (a test-only NuGet dep) — keep it that way; don't shell out to exiftool/ImageMagick, which aren't on the CI runner. CI runs build then test on every push/PR (`.github/workflows/ci.yml`).
+Tests live in `Borderize.Tests/` (xUnit) and cover `InputResolver`, `OptionParsing`, and `BorderProcessor.ComputeBorders`/`BuildOutputPath`/`OrientUpright`. EXIF-orientation fixtures are synthesized in-process with `ExifLibNet` (a test-only NuGet dep) — keep it that way; don't shell out to exiftool/ImageMagick, which aren't in the container. CI builds and tests inside Docker on every push/PR: the multi-stage `Dockerfile` (`mcr.microsoft.com/dotnet/sdk:10.0`) has a `build` stage and a `test` stage, and `.github/workflows/ci.yml` runs `docker build --target test` (a failing test fails the build, gating CI). The `SkiaSharp.NativeAssets.Linux.NoDependencies` package means the native lib loads in the minimal container with no extra `apt` packages — keep it.
 
 ## Architecture
 
