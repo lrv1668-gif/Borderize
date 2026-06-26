@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="4.148.0" />
-    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="4.148.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0" />
     <PackageReference Include="System.CommandLine" Version="3.0.0-preview.5.26302.115" />
   </ItemGroup>
 
