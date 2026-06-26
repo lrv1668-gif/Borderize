@@ -1,6 +1,5 @@
 using Borderize;
 using Borderize.Models;
-using SkiaSharp;
 using System.CommandLine;
 
 var inputArg = new Argument<string>("input")
@@ -10,7 +9,7 @@ var inputArg = new Argument<string>("input")
 
 var styleOption = new Option<string>("--style", [])
 {
-    Description = "Border style: uniform | polaroid",
+    Description = "Border style: uniform | polaroid | aspect",
     DefaultValueFactory = _ => "uniform",
 };
 
@@ -23,6 +22,12 @@ var sizeOption = new Option<string>("--size", [])
 var bottomOption = new Option<string?>("--bottom", [])
 {
     Description = "Override bottom border size. Polaroid default is 3x --size; uniform default matches --size.",
+};
+
+var aspectOption = new Option<string>("--aspect", [])
+{
+    Description = "Target ratio W:H for --style aspect (e.g. 1:1, 4:5). Ignored for other styles.",
+    DefaultValueFactory = _ => "1:1",
 };
 
 var colorOption = new Option<string>("--color", [])
@@ -58,34 +63,47 @@ var verboseOption = new Option<bool>("--verbose", ["-v"])
     Description = "Print each file as it is processed.",
 };
 
+var parallelOption = new Option<int>("--parallel", [])
+{
+    Description = "Max files to process concurrently. 0 = one per CPU core.",
+    DefaultValueFactory = _ => 0,
+};
+
 var rootCommand = new RootCommand("borderize — add photo borders from the command line")
 {
     inputArg,
     styleOption,
     sizeOption,
     bottomOption,
+    aspectOption,
     colorOption,
     suffixOption,
     recursiveOption,
     qualityOption,
     dryRunOption,
     verboseOption,
+    parallelOption,
 };
 
 rootCommand.SetAction((ParseResult result) =>
 {
     var input = result.GetValue(inputArg)!;
-    var style = ParseStyle(result.GetValue(styleOption)!);
+    var style = OptionParsing.ParseStyle(result.GetValue(styleOption)!);
     var size = result.GetValue(sizeOption)!;
     var bottom = result.GetValue(bottomOption);
-    var color = ParseColor(result.GetValue(colorOption)!);
+    var aspect = OptionParsing.ParseAspect(result.GetValue(aspectOption)!);
+    var color = OptionParsing.ParseColor(result.GetValue(colorOption)!);
     var suffix = result.GetValue(suffixOption)!;
     var recursive = result.GetValue(recursiveOption);
     var quality = result.GetValue(qualityOption);
     var dryRun = result.GetValue(dryRunOption);
     var verbose = result.GetValue(verboseOption);
+    var parallel = result.GetValue(parallelOption);
 
-    var options = new BorderOptions(style, size, bottom, color, suffix, recursive, quality, dryRun, verbose);
+    if (style != BorderStyle.Aspect && result.GetResult(aspectOption)?.Implicit == false)
+        Console.Error.WriteLine("Warning: --aspect is ignored unless --style aspect is set.");
+
+    var options = new BorderOptions(style, size, bottom, aspect, color, suffix, recursive, quality, dryRun, verbose);
 
     var files = InputResolver.Resolve(input, recursive, suffix).ToList();
 
@@ -99,63 +117,40 @@ rootCommand.SetAction((ParseResult result) =>
         ? $"Dry run — {files.Count} file(s) would be processed:"
         : $"Processing {files.Count} file(s)...");
 
-    int processed = 0, skipped = 0;
-
-    foreach (var file in files)
+    if (dryRun)
     {
-        var outputPath = Path.Combine(
-            Path.GetDirectoryName(file) ?? ".",
-            $"{Path.GetFileNameWithoutExtension(file)}{suffix}{Path.GetExtension(file)}");
+        foreach (var file in files)
+            Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix)}");
+        return;
+    }
 
-        if (dryRun)
-        {
-            Console.WriteLine($"  {file}  ->  {outputPath}");
-            continue;
-        }
+    int processed = 0, skipped = 0;
+    var consoleLock = new object();
 
+    var parallelOptions = new ParallelOptions
+    {
+        MaxDegreeOfParallelism = parallel > 0 ? parallel : Environment.ProcessorCount,
+    };
+
+    Parallel.ForEach(files, parallelOptions, file =>
+    {
         try
         {
-            if (verbose) Console.Write($"  {file}");
             BorderProcessor.Process(file, options);
-            if (verbose) Console.WriteLine($"  ->  {outputPath}");
-            processed++;
+            Interlocked.Increment(ref processed);
+            if (verbose)
+                lock (consoleLock)
+                    Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix)}");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"  ERROR {file}: {ex.Message}");
-            skipped++;
+            Interlocked.Increment(ref skipped);
+            lock (consoleLock)
+                Console.Error.WriteLine($"  ERROR {file}: {ex.Message}");
         }
-    }
+    });
 
-    if (!dryRun)
-        Console.WriteLine($"Done. {processed} processed, {skipped} failed.");
+    Console.WriteLine($"Done. {processed} processed, {skipped} failed.");
 });
 
 return await rootCommand.Parse(args).InvokeAsync();
-
-static BorderStyle ParseStyle(string value) => value.ToLowerInvariant() switch
-{
-    "polaroid" => BorderStyle.Polaroid,
-    "uniform" => BorderStyle.Uniform,
-    _ => throw new ArgumentException($"Unknown style '{value}'. Use: uniform, polaroid"),
-};
-
-static SKColor ParseColor(string value) => value.ToLowerInvariant() switch
-{
-    "white" => SKColors.White,
-    "black" => SKColors.Black,
-    _ when value.StartsWith('#') => HexToSKColor(value),
-    _ => throw new ArgumentException($"Unknown color '{value}'. Use: white, black, or #RRGGBB"),
-};
-
-static SKColor HexToSKColor(string hex)
-{
-    var h = hex.TrimStart('#');
-    if (h.Length != 6)
-        throw new ArgumentException($"Hex color must be 6 digits, e.g. #FFFFFF. Got: {hex}");
-    return new SKColor(
-        Convert.ToByte(h[..2], 16),
-        Convert.ToByte(h[2..4], 16),
-        Convert.ToByte(h[4..6], 16),
-        255);
-}

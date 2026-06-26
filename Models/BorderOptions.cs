@@ -2,10 +2,11 @@ using SkiaSharp;
 
 namespace Borderize.Models;
 
-record BorderOptions(
+public record BorderOptions(
     BorderStyle Style,
     string Size,
     string? Bottom,
+    (int W, int H) Aspect,
     SKColor Color,
     string Suffix,
     bool Recursive,

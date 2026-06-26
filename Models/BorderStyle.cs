@@ -1,7 +1,8 @@
 namespace Borderize.Models;
 
-enum BorderStyle
+public enum BorderStyle
 {
     Uniform,
     Polaroid,
+    Aspect,
 }
