@@ -9,10 +9,21 @@
     <ToolCommandName>borderize</ToolCommandName>
     <PackageId>Borderize</PackageId>
     <Version>1.0.0</Version>
+
+    <!-- NuGet listing metadata. Version is overridden by the publish workflow
+         (-p:Version from the release tag); the value above is the local-pack fallback. -->
+    <Authors>lrv1668-gif</Authors>
+    <Description>A CLI tool for adding borders to photos (uniform, polaroid, and aspect-ratio padding), built for camera export workflows.</Description>
+    <PackageTags>cli;photo;border;image;polaroid;skiasharp;dotnet-tool</PackageTags>
+    <RepositoryUrl>https://github.com/lrv1668-gif/Borderize</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/lrv1668-gif/Borderize</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="Borderize.Tests/**" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
