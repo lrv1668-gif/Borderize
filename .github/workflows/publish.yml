@@ -7,6 +7,9 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Must match the Environment configured on the nuget.org Trusted Publishing
+    # policy, so the OIDC token carries the expected 'environment' claim.
+    environment: production
     permissions:
       id-token: write   # required for NuGet Trusted Publishing (OIDC token exchange)
       contents: read
