@@ -72,6 +72,7 @@ public class InputResolverTests : IDisposable
     public void SingleFile_PassesThrough_WhenNotAlreadyBordered()
     {
         var path = Path.Combine(_tempDir, "photo.jpg");
+        File.WriteAllText(path, "");
 
         var result = InputResolver.Resolve(path, recursive: false, suffix: "-border").ToList();
 
@@ -83,9 +84,29 @@ public class InputResolverTests : IDisposable
     public void SingleFile_ReturnsEmpty_WhenAlreadyBordered()
     {
         var path = Path.Combine(_tempDir, "photo-border.jpg");
+        File.WriteAllText(path, "");
 
         var result = InputResolver.Resolve(path, recursive: false, suffix: "-border").ToList();
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public void SingleFile_Throws_WhenFileDoesNotExist()
+    {
+        var path = Path.Combine(_tempDir, "missing.jpg");
+
+        Assert.Throws<FileNotFoundException>(
+            () => InputResolver.Resolve(path, recursive: false, suffix: "-border").ToList());
+    }
+
+    [Fact]
+    public void SingleFile_Throws_WhenExtensionUnsupported()
+    {
+        var path = Path.Combine(_tempDir, "notes.txt");
+        File.WriteAllText(path, "");
+
+        Assert.Throws<ArgumentException>(
+            () => InputResolver.Resolve(path, recursive: false, suffix: "-border").ToList());
     }
 }

@@ -20,16 +20,25 @@ public static class InputResolver
             var dir = Path.GetDirectoryName(input);
             var pattern = Path.GetFileName(input);
             var baseDir = string.IsNullOrEmpty(dir) ? "." : dir;
-            files = Directory.EnumerateFiles(baseDir, pattern, searchOption)
-                .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
+            files = Directory.EnumerateFiles(baseDir, pattern, searchOption).Where(IsSupported);
         }
         else
         {
+            // Single named file: unlike directory/glob mode the user asked for this
+            // specific file, so surface a clear error rather than silently dropping it.
+            if (!File.Exists(input))
+                throw new FileNotFoundException($"File not found: {input}", input);
+            if (!IsSupported(input))
+                throw new ArgumentException(
+                    $"Unsupported file type '{Path.GetExtension(input)}'. Supported: {string.Join(", ", SupportedExtensions)}");
             files = [input];
         }
 
         return files.Where(f => !IsAlreadyBordered(f, suffix));
     }
+
+    static bool IsSupported(string path)
+        => SupportedExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
 
     static bool IsAlreadyBordered(string path, string suffix)
     {

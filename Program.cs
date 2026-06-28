@@ -87,30 +87,62 @@ var rootCommand = new RootCommand("borderize — add photo borders from the comm
 
 rootCommand.SetAction((ParseResult result) =>
 {
-    var input = result.GetValue(inputArg)!;
-    var style = OptionParsing.ParseStyle(result.GetValue(styleOption)!);
-    var size = result.GetValue(sizeOption)!;
-    var bottom = result.GetValue(bottomOption);
-    var aspect = OptionParsing.ParseAspect(result.GetValue(aspectOption)!);
-    var color = OptionParsing.ParseColor(result.GetValue(colorOption)!);
-    var suffix = result.GetValue(suffixOption)!;
-    var recursive = result.GetValue(recursiveOption);
-    var quality = result.GetValue(qualityOption);
-    var dryRun = result.GetValue(dryRunOption);
-    var verbose = result.GetValue(verboseOption);
-    var parallel = result.GetValue(parallelOption);
+    BorderOptions options;
+    string input;
+    bool recursive, dryRun, verbose;
+    string suffix;
+    int parallel;
+    try
+    {
+        input = result.GetValue(inputArg)!;
+        var style = OptionParsing.ParseStyle(result.GetValue(styleOption)!);
+        var size = result.GetValue(sizeOption)!;
+        var bottom = result.GetValue(bottomOption);
+        var color = OptionParsing.ParseColor(result.GetValue(colorOption)!);
+        suffix = result.GetValue(suffixOption)!;
+        recursive = result.GetValue(recursiveOption);
+        var quality = result.GetValue(qualityOption);
+        dryRun = result.GetValue(dryRunOption);
+        verbose = result.GetValue(verboseOption);
+        parallel = result.GetValue(parallelOption);
 
-    if (style != BorderStyle.Aspect && result.GetResult(aspectOption)?.Implicit == false)
-        Console.Error.WriteLine("Warning: --aspect is ignored unless --style aspect is set.");
+        // --aspect only matters for the aspect style; for other styles warn (don't
+        // fail) if it was explicitly set, and don't bother validating its value.
+        bool aspectExplicit = result.GetResult(aspectOption)?.Implicit == false;
+        (int W, int H) aspect = (1, 1);
+        if (style == BorderStyle.Aspect)
+            aspect = OptionParsing.ParseAspect(result.GetValue(aspectOption)!);
+        else if (aspectExplicit)
+            Console.Error.WriteLine("Warning: --aspect is ignored unless --style aspect is set.");
 
-    var options = new BorderOptions(style, size, bottom, aspect, color, suffix, recursive, quality, dryRun, verbose);
+        if (quality < 1 || quality > 100)
+            throw new ArgumentException($"Quality must be between 1 and 100. Got: {quality}");
+        if (string.IsNullOrEmpty(suffix))
+            throw new ArgumentException("Suffix must not be empty (it prevents overwriting the original).");
 
-    var files = InputResolver.Resolve(input, recursive, suffix).ToList();
+        options = new BorderOptions(style, size, bottom, aspect, color, suffix, recursive, quality, dryRun, verbose);
+    }
+    catch (ArgumentException ex)
+    {
+        Console.Error.WriteLine($"Error: {ex.Message}");
+        return 1;
+    }
+
+    List<string> files;
+    try
+    {
+        files = InputResolver.Resolve(input, recursive, suffix).ToList();
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+    {
+        Console.Error.WriteLine($"Error: {ex.Message}");
+        return 1;
+    }
 
     if (files.Count == 0)
     {
         Console.WriteLine("No matching files found.");
-        return;
+        return 0;
     }
 
     Console.WriteLine(dryRun
@@ -121,7 +153,7 @@ rootCommand.SetAction((ParseResult result) =>
     {
         foreach (var file in files)
             Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix)}");
-        return;
+        return 0;
     }
 
     int processed = 0, skipped = 0;
@@ -151,6 +183,7 @@ rootCommand.SetAction((ParseResult result) =>
     });
 
     Console.WriteLine($"Done. {processed} processed, {skipped} failed.");
+    return skipped > 0 ? 1 : 0;
 });
 
 return await rootCommand.Parse(args).InvokeAsync();

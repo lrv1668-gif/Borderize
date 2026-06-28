@@ -30,6 +30,13 @@ public class BorderProcessorTests
     }
 
     [Fact]
+    public void Polaroid_BottomOverride_ReplacesThreeTimesDefault()
+    {
+        var (top, right, bottom, left) = BorderProcessor.ComputeBorders(1200, 800, Options(BorderStyle.Polaroid, "40", bottom: "100"));
+        Assert.Equal((40, 40, 100, 40), (top, right, bottom, left));
+    }
+
+    [Fact]
     public void Polaroid_BottomDefaultsToThreeTimesSide()
     {
         var (top, right, bottom, left) = BorderProcessor.ComputeBorders(1200, 800, Options(BorderStyle.Polaroid, "40"));
@@ -156,5 +163,65 @@ public class BorderProcessorTests
         Assert.Equal(2, result.Width);
         Assert.Equal(4, result.Height);
         Assert.Equal(SKColors.Red, result.GetPixel(1, 3));
+    }
+
+    [Fact]
+    public void OrientUpright_BottomLeft_FlipsVerticallyWithoutSwappingDimensions()
+    {
+        var bmp = new SKBitmap(2, 4);
+        using (var c = new SKCanvas(bmp)) c.Clear(SKColors.White);
+        bmp.SetPixel(0, 0, SKColors.Red);
+
+        // BottomLeft = vertical flip. Source (x,y) -> dest (x, sh-1-y); (0,0) -> (0,3).
+        using var result = BorderProcessor.OrientUpright(bmp, SKEncodedOrigin.BottomLeft);
+
+        Assert.Equal(2, result.Width);
+        Assert.Equal(4, result.Height);
+        Assert.Equal(SKColors.Red, result.GetPixel(0, 3));
+    }
+
+    [Fact]
+    public void OrientUpright_LeftTop_TransposesAndSwapsDimensions()
+    {
+        var bmp = new SKBitmap(2, 4);
+        using (var c = new SKCanvas(bmp)) c.Clear(SKColors.White);
+        bmp.SetPixel(0, 1, SKColors.Red);
+
+        // LeftTop = transpose. Source (x,y) -> dest (y, x); (0,1) -> (1,0).
+        using var result = BorderProcessor.OrientUpright(bmp, SKEncodedOrigin.LeftTop);
+
+        Assert.Equal(4, result.Width);
+        Assert.Equal(2, result.Height);
+        Assert.Equal(SKColors.Red, result.GetPixel(1, 0));
+    }
+
+    [Fact]
+    public void OrientUpright_RightBottom_TransposesWithFlipAndSwapsDimensions()
+    {
+        var bmp = new SKBitmap(2, 4);
+        using (var c = new SKCanvas(bmp)) c.Clear(SKColors.White);
+        bmp.SetPixel(0, 0, SKColors.Red);
+
+        // RightBottom = transverse. Source (x,y) -> dest (sh-1-y, sw-1-x); (0,0) -> (3,1).
+        using var result = BorderProcessor.OrientUpright(bmp, SKEncodedOrigin.RightBottom);
+
+        Assert.Equal(4, result.Width);
+        Assert.Equal(2, result.Height);
+        Assert.Equal(SKColors.Red, result.GetPixel(3, 1));
+    }
+
+    [Fact]
+    public void OrientUpright_LeftBottom_Rotates90CounterClockwiseAndSwapsDimensions()
+    {
+        var bmp = new SKBitmap(2, 4);
+        using (var c = new SKCanvas(bmp)) c.Clear(SKColors.White);
+        bmp.SetPixel(0, 0, SKColors.Red);
+
+        // LeftBottom = 90° CCW. Source (x,y) -> dest (y, sw-1-x); (0,0) -> (0,1).
+        using var result = BorderProcessor.OrientUpright(bmp, SKEncodedOrigin.LeftBottom);
+
+        Assert.Equal(4, result.Width);
+        Assert.Equal(2, result.Height);
+        Assert.Equal(SKColors.Red, result.GetPixel(0, 1));
     }
 }

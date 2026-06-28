@@ -36,18 +36,21 @@ public static class OptionParsing
     /// <summary>
     /// Resolves a size string to pixels. A trailing '%' is interpreted as a
     /// percentage of <paramref name="referenceDimension"/>; otherwise the value
-    /// is treated as a raw pixel count.
+    /// is treated as a raw pixel count. Negative results are rejected; a
+    /// percentage clamps to a minimum of 1 pixel.
     /// </summary>
     public static int ParseSize(string value, int referenceDimension)
     {
         if (value.EndsWith('%'))
         {
-            if (!double.TryParse(value[..^1], out double pct))
+            if (!double.TryParse(value[..^1], out double pct) || pct < 0)
                 throw new ArgumentException($"Invalid percentage: {value}");
             return Math.Max(1, (int)Math.Round(referenceDimension * pct / 100.0));
         }
         if (!int.TryParse(value, out int px))
             throw new ArgumentException($"Invalid size value: {value}");
+        if (px < 0)
+            throw new ArgumentException($"Size must not be negative: {value}");
         return px;
     }
 

@@ -67,9 +67,17 @@ public class OptionParsingTests
     [InlineData("abc")]
     [InlineData("10px")]
     [InlineData("%")]
+    [InlineData("-50")]
+    [InlineData("-5%")]
     public void ParseSize_Throws_OnInvalid(string input)
     {
         Assert.Throws<ArgumentException>(() => OptionParsing.ParseSize(input, 800));
+    }
+
+    [Fact]
+    public void ParseSize_Zero_IsAllowed()
+    {
+        Assert.Equal(0, OptionParsing.ParseSize("0", 800));
     }
 
     [Theory]
