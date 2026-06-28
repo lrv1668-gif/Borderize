@@ -10,22 +10,23 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 ```sh
 git clone <this repo>
 cd borderize
-dotnet pack -o ./nupkg -c Release
-dotnet tool install --global --add-source ./nupkg borderize
+./install-local.sh
 ```
 
-After making code changes, rebuild and reinstall:
+`install-local.sh` packs a Release build, removes any previously installed copy,
+and installs the freshly built package. Re-run it after code changes to update the
+installed binaries — it works for both the first install and the dev loop.
 
-```sh
-dotnet pack -o ./nupkg -c Release
-dotnet tool uninstall --global borderize
-dotnet tool install --global --add-source ./nupkg borderize
-```
-
-> **Note:** use uninstall + install, not `dotnet tool update`. Update is
-> version-based, so if `<Version>` in the csproj hasn't changed it reports the
-> tool as already up to date and your new build is never installed. (When you
-> publish a real release you bump `<Version>` anyway, and `update` works then.)
+> **Why a script instead of the bare `dotnet tool` commands:**
+>
+> - **Reinstall, not `dotnet tool update`.** Update is version-based, so if
+>   `<Version>` in the csproj hasn't changed it reports the tool as already up to
+>   date and your new build is never installed. (When you publish a real release you
+>   bump `<Version>` anyway, and `update` works then.)
+> - **Install must pin `--version`.** `dotnet tool install --add-source ./nupkg` is
+>   *additive* — it doesn't replace nuget.org. Borderize is published there, so
+>   without `--version` install picks the higher published version instead of your
+>   local build. The script reads `<Version>` from the csproj and pins it.
 
 ## Testing
 

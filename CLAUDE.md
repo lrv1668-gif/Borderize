@@ -11,16 +11,17 @@ dotnet run -- ./photo.jpg --style polaroid
 # Build
 dotnet build
 
-# First-time install
-dotnet pack -o ./nupkg -c Release
-dotnet tool install --global --add-source ./nupkg borderize
+# Install / reinstall the global tool from a local build (first time and dev loop).
+# ./install-local.sh packs, uninstalls any existing copy, and reinstalls.
+./install-local.sh
 
-# Reinstall the global tool after code changes (local dev loop).
-# Use uninstall + install, NOT `dotnet tool update`: update is version-based and
-# silently no-ops when <Version> is unchanged, so the new build never lands.
-dotnet pack -o ./nupkg -c Release
-dotnet tool uninstall --global borderize
-dotnet tool install --global --add-source ./nupkg borderize
+# What the script handles, and why not to do it by hand:
+#  - Reinstall (not `dotnet tool update`): update is version-based and silently
+#    no-ops when <Version> is unchanged, so the new build never lands.
+#  - `dotnet tool install --add-source ./nupkg` WITHOUT `--version` does NOT install
+#    the local build: --add-source is additive (it doesn't replace nuget.org), and
+#    Borderize is published there at a higher version, so install picks the published
+#    one. The script reads <Version> from the csproj and pins `--version` to it.
 
 # Run the test suite
 dotnet test
