@@ -37,15 +37,21 @@ Tests live in `Borderize.Tests/` (xUnit) and cover `InputResolver`, `OptionParsi
 
 ## Architecture
 
-The pipeline is: **Cli.cs** parses CLI args → **InputResolver** resolves them to a file list → **BorderProcessor** transforms each file. **Program.cs** is a one-line entry point (`return await Borderize.Cli.RunAsync(args);`).
+The pipeline is: **Cli/Cli.cs** parses CLI args → **Processing/InputResolver.cs** resolves them to a file list → **Processing/BorderProcessor.cs** transforms each file. **Program.cs** (project root) is a one-line entry point (`return await Borderize.Cli.RunAsync(args);`).
 
-**`Cli.cs`** — CLI definition using System.CommandLine 3.x (preview). `Cli.Build()` constructs the `RootCommand` (all options + the `SetAction` handler) and `Cli.RunAsync(args)` parses and invokes it, returning the exit code. Kept separate from `Program.cs` so the integration tests can drive the whole CLI in-process. Uses `DefaultValueFactory` (not `DefaultValue`) and passes aliases as an array in the constructor (not `.AddAlias()`). Parses option strings into typed values via `OptionParsing` before constructing `BorderOptions`, then drives the main loop with `Parallel.ForEach` (`--parallel`, default = `Environment.ProcessorCount`); counters use `Interlocked` and console writes are guarded by a lock.
+Source is organized into folders, all sharing the flat `Borderize` namespace except `Models/` (`Borderize.Models`); folders are organizational only and the `.csproj` globs `**/*.cs`, so adding/moving files between them needs no project edits:
+- `Cli/` — `Cli.cs`, `OptionParsing.cs`
+- `Processing/` — `BorderProcessor.cs`, `InputResolver.cs`
+- `Models/` — `BorderOptions.cs`, `BorderStyle.cs`
+- `Program.cs` — entry point at the project root
 
-**`OptionParsing.cs`** — `public static` helpers that turn CLI strings into typed values: `ParseStyle`, `ParseColor`, `ParseSize` (pixels vs percentage), `ParseAspect` (`W:H`). Public so the test project can exercise them directly.
+**`Cli/Cli.cs`** — CLI definition using System.CommandLine 3.x (preview). `Cli.Build()` constructs the `RootCommand` (all options + the `SetAction` handler) and `Cli.RunAsync(args)` parses and invokes it, returning the exit code. Kept separate from `Program.cs` so the integration tests can drive the whole CLI in-process. Uses `DefaultValueFactory` (not `DefaultValue`) and passes aliases as an array in the constructor (not `.AddAlias()`). Parses option strings into typed values via `OptionParsing` before constructing `BorderOptions`, then drives the main loop with `Parallel.ForEach` (`--parallel`, default = `Environment.ProcessorCount`); counters use `Interlocked` and console writes are guarded by a lock.
 
-**`InputResolver.cs`** — Converts the `input` argument into a flat list of file paths. Handles three modes: directory enumeration, glob (`*`/`?`), and single file. Filters to supported extensions and skips files whose names already end with the configured suffix (prevents double-bordering).
+**`Cli/OptionParsing.cs`** — `public static` helpers that turn CLI strings into typed values: `ParseStyle`, `ParseColor`, `ParseSize` (pixels vs percentage), `ParseAspect` (`W:H`). Public so the test project can exercise them directly.
 
-**`BorderProcessor.cs`** — Core image logic using SkiaSharp. `ComputeBorders` (public, pure — unit-tested) resolves pixel vs percentage sizes (percentage is relative to the shorter dimension) and applies Uniform / Polaroid / Aspect proportions. Aspect pads centered to a target ratio with a minimum margin. Draws by filling a new canvas with the border color then blitting the original at an offset. Output format is inferred from the source extension; quality only applies to JPEG/WebP.
+**`Processing/InputResolver.cs`** — Converts the `input` argument into a flat list of file paths. Handles three modes: directory enumeration, glob (`*`/`?`), and single file. Filters to supported extensions and skips files whose names already end with the configured suffix (prevents double-bordering).
+
+**`Processing/BorderProcessor.cs`** — Core image logic using SkiaSharp. `ComputeBorders` (public, pure — unit-tested) resolves pixel vs percentage sizes (percentage is relative to the shorter dimension) and applies Uniform / Polaroid / Aspect proportions. Aspect pads centered to a target ratio with a minimum margin. Draws by filling a new canvas with the border color then blitting the original at an offset. Output format is inferred from the source extension; quality only applies to JPEG/WebP.
 
 **`Models/`** — `BorderOptions` is a positional record threaded through the pipeline. `BorderStyle` is a three-value enum (`Uniform`, `Polaroid`, `Aspect`). Both are `public` so tests can construct/inspect them.
 
