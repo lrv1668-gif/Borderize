@@ -29,7 +29,7 @@
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="4.148.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0" />
-    <PackageReference Include="System.CommandLine" Version="3.0.0-preview.5.26302.115" />
+    <PackageReference Include="System.CommandLine" Version="3.0.0-preview.6.26359.118" />
   </ItemGroup>
 
 </Project>
