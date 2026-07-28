@@ -25,7 +25,10 @@ public static class BorderProcessor
         canvas.DrawBitmap(original, new SKPoint(left, top), new SKSamplingOptions(SKFilterMode.Nearest));
         canvas.Flush();
 
-        var outputPath = BuildOutputPath(inputPath, options.Suffix);
+        var outputPath = BuildOutputPath(inputPath, options.Suffix, options.OutputDir);
+
+        if (options.OutputDir is not null)
+            Directory.CreateDirectory(options.OutputDir);
 
         using var image = SKImage.FromBitmap(canvasBitmap);
         Save(image, outputPath, inputPath, options.Quality);
@@ -123,9 +126,9 @@ public static class BorderProcessor
         }
     }
 
-    public static string BuildOutputPath(string inputPath, string suffix)
+    public static string BuildOutputPath(string inputPath, string suffix, string? outputDir = null)
     {
-        var dir = Path.GetDirectoryName(inputPath) ?? ".";
+        var dir = outputDir ?? Path.GetDirectoryName(inputPath) ?? ".";
         var name = Path.GetFileNameWithoutExtension(inputPath);
         var ext = Path.GetExtension(inputPath);
         return Path.Combine(dir, $"{name}{suffix}{ext}");

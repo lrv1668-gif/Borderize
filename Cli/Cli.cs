@@ -56,6 +56,11 @@ public static class Cli
             DefaultValueFactory = _ => "-border",
         };
 
+        var outputDirOption = new Option<string?>("--output-dir", ["-o"])
+        {
+            Description = "Directory to write output files to (created if missing). Default: alongside each input file.",
+        };
+
         var recursiveOption = new Option<bool>("--recursive", ["-r"])
         {
             Description = "Recurse into subfolders when input is a directory.",
@@ -92,6 +97,7 @@ public static class Cli
             aspectOption,
             colorOption,
             suffixOption,
+            outputDirOption,
             recursiveOption,
             qualityOption,
             dryRunOption,
@@ -105,6 +111,7 @@ public static class Cli
             string input;
             bool recursive, dryRun, verbose;
             string suffix;
+            string? outputDir;
             int parallel;
             try
             {
@@ -114,6 +121,7 @@ public static class Cli
                 var bottom = result.GetValue(bottomOption);
                 var color = OptionParsing.ParseColor(result.GetValue(colorOption)!);
                 suffix = result.GetValue(suffixOption)!;
+                outputDir = result.GetValue(outputDirOption);
                 recursive = result.GetValue(recursiveOption);
                 var quality = result.GetValue(qualityOption);
                 dryRun = result.GetValue(dryRunOption);
@@ -133,8 +141,10 @@ public static class Cli
                     throw new ArgumentException($"Quality must be between 1 and 100. Got: {quality}");
                 if (string.IsNullOrEmpty(suffix))
                     throw new ArgumentException("Suffix must not be empty (it prevents overwriting the original).");
+                if (outputDir is not null && File.Exists(outputDir))
+                    throw new ArgumentException($"--output-dir must be a directory, but a file exists at: {outputDir}");
 
-                options = new BorderOptions(style, size, bottom, aspect, color, suffix, recursive, quality, dryRun, verbose);
+                options = new BorderOptions(style, size, bottom, aspect, color, suffix, recursive, quality, dryRun, verbose, outputDir);
             }
             catch (ArgumentException ex)
             {
@@ -166,7 +176,7 @@ public static class Cli
             if (dryRun)
             {
                 foreach (var file in files)
-                    Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix)}");
+                    Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix, outputDir)}");
                 return 0;
             }
 
@@ -186,7 +196,7 @@ public static class Cli
                     Interlocked.Increment(ref processed);
                     if (verbose)
                         lock (consoleLock)
-                            Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix)}");
+                            Console.WriteLine($"  {file}  ->  {BorderProcessor.BuildOutputPath(file, suffix, outputDir)}");
                 }
                 catch (Exception ex)
                 {

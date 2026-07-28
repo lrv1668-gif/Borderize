@@ -12,5 +12,6 @@ public record BorderOptions(
     bool Recursive,
     int Quality,
     bool DryRun,
-    bool Verbose
+    bool Verbose,
+    string? OutputDir = null
 );

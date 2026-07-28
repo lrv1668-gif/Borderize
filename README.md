@@ -65,7 +65,7 @@ borderize <input> [options]
 
 Supported formats: `.jpg`, `.jpeg`, `.png`, `.webp`
 
-Output is written alongside the original with a suffix appended to the filename. The original is never modified.
+Output is written alongside the original with a suffix appended to the filename (or into `--output-dir` if set). The original is never modified.
 
 ```
 IMG_0042.jpg  →  IMG_0042-border.jpg
@@ -100,6 +100,9 @@ borderize ./photos/ --style aspect --aspect 4:5
 
 # Throttle concurrency on a large batch
 borderize ./export/ --recursive --parallel 4
+
+# Write outputs to a separate folder instead of alongside the originals
+borderize ./photos/ --output-dir ./bordered
 ```
 
 ## Options
@@ -112,6 +115,7 @@ borderize ./export/ --recursive --parallel 4
 | `--aspect` | `1:1` | Target ratio `W:H` for `--style aspect` (e.g. `1:1`, `4:5`). Ignored for other styles. |
 | `--color` | `white` | Border color: `white`, `black`, or a hex value like `#F5F0EB` |
 | `--suffix` | `-border` | Suffix added before the file extension on output files |
+| `--output-dir`, `-o` | — | Directory to write output files to (created if missing). Default: alongside each input file. |
 | `--quality` | `95` | JPEG/WebP output quality, 1–100 |
 | `--recursive`, `-r` | off | Recurse into subfolders when input is a directory |
 | `--parallel` | `0` | Max files to process concurrently. `0` = one per CPU core. Lower it (e.g. `4`) to cap memory on very large batches. |
@@ -123,3 +127,4 @@ borderize ./export/ --recursive --parallel 4
 - Files whose names already end with the configured suffix are skipped automatically, so re-running on a folder won't double-border your outputs.
 - PNG output is lossless; `--quality` only applies to JPEG and WebP.
 - Border size as a percentage scales with the image, so the same command works on both high-resolution camera files and smaller exports.
+- `--output-dir` flattens output into a single folder — with `--recursive`, files of the same name from different subfolders will overwrite each other there.
