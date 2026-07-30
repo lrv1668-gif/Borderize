@@ -14,7 +14,7 @@ jobs:
       id-token: write   # required for NuGet Trusted Publishing (OIDC token exchange)
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Derive and validate version from release tag
         id: version
@@ -32,7 +32,7 @@ jobs:
       - name: Run tests in Docker (gate)
         run: docker build --target test .
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.x"
 
