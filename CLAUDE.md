@@ -11,17 +11,8 @@ dotnet run -- ./photo.jpg --style polaroid
 # Build
 dotnet build
 
-# Install / reinstall the global tool from a local build (first time and dev loop).
-# ./install-local.sh packs, uninstalls any existing copy, and reinstalls.
+# Install / reinstall the global tool from a local build (first time and dev loop)
 ./install-local.sh
-
-# What the script handles, and why not to do it by hand:
-#  - Reinstall (not `dotnet tool update`): update is version-based and silently
-#    no-ops when <Version> is unchanged, so the new build never lands.
-#  - `dotnet tool install --add-source ./nupkg` WITHOUT `--version` does NOT install
-#    the local build: --add-source is additive (it doesn't replace nuget.org), and
-#    Borderize is published there at a higher version, so install picks the published
-#    one. The script reads <Version> from the csproj and pins `--version` to it.
 
 # Run the test suite
 dotnet test
@@ -33,27 +24,51 @@ docker build --target test .
 docker build --target build .
 ```
 
-Tests live in `Borderize.Tests/` (xUnit) and cover `InputResolver`, `OptionParsing`, `BorderProcessor.ComputeBorders`/`BuildOutputPath`/`OrientUpright`, and the full CLI end-to-end. `CliTests` drive the real command in-process via `Cli.RunAsync(args)`, asserting on exit code, captured stdout/stderr, and the actual output files — they must stay in the non-parallel `[Collection("CLI")]` because they redirect the process-global `Console.Out`/`Error`. EXIF-orientation fixtures are synthesized in-process with `ExifLibNet` (a test-only NuGet dep) — keep it that way; don't shell out to exiftool/ImageMagick, which aren't in the container. CI builds and tests inside Docker on every push/PR: the multi-stage `Dockerfile` (`mcr.microsoft.com/dotnet/sdk:10.0`) has a `build` stage and a `test` stage, and `.github/workflows/ci.yml` runs `docker build --target test` (a failing test fails the build, gating CI). The `SkiaSharp.NativeAssets.Linux.NoDependencies` package means the native lib loads in the minimal container with no extra `apt` packages — keep it.
+Always use `./install-local.sh` to install a local build — never bare `dotnet tool install`/`update`, which silently install the nuget.org version or no-op. The script header explains why.
+
+## Tests
+
+Tests live in `Borderize.Tests/` (xUnit), one file per component plus `CliTests` for the full CLI end-to-end. Rules that aren't obvious from reading them:
+
+- `CliTests` drive the real command in-process via `Cli.RunAsync(args)` and redirect the process-global `Console.Out`/`Error`, so they must stay in the non-parallel `[Collection("CLI")]`.
+- EXIF-orientation fixtures are synthesized in-process with `ExifLibNet` (a test-only NuGet dep) — keep it that way; don't shell out to exiftool/ImageMagick, which aren't in the container.
+
+CI builds and tests inside Docker on every push/PR: the multi-stage `Dockerfile` (`mcr.microsoft.com/dotnet/sdk:10.0`) has a `build` stage and a `test` stage, and `.github/workflows/ci.yml` runs `docker build --target test` (a failing test fails the build). The `SkiaSharp.NativeAssets.Linux.NoDependencies` package means the native lib loads in the minimal container with no extra `apt` packages — keep it.
 
 ## Architecture
 
 The pipeline is: **Cli/Cli.cs** parses CLI args → **Processing/InputResolver.cs** resolves them to a file list → **Processing/BorderProcessor.cs** transforms each file. **Program.cs** (project root) is a one-line entry point (`return await Borderize.Cli.RunAsync(args);`).
 
-Source is organized into folders, all sharing the flat `Borderize` namespace except `Models/` (`Borderize.Models`); folders are organizational only and the `.csproj` globs `**/*.cs`, so adding/moving files between them needs no project edits:
-- `Cli/` — `Cli.cs`, `OptionParsing.cs`
-- `Processing/` — `BorderProcessor.cs`, `InputResolver.cs`
-- `Models/` — `BorderOptions.cs`, `BorderStyle.cs`
-- `Program.cs` — entry point at the project root
+Source is organized into folders, all sharing the flat `Borderize` namespace except `Models/` (`Borderize.Models`); folders are organizational only and the `.csproj` globs `**/*.cs`, so adding/moving files needs no project edits.
 
-**`Cli/Cli.cs`** — CLI definition using System.CommandLine 3.x (preview). `Cli.Build()` constructs the `RootCommand` (all options + the `SetAction` handler) and `Cli.RunAsync(args)` parses and invokes it, returning the exit code. Kept separate from `Program.cs` so the integration tests can drive the whole CLI in-process. Uses `DefaultValueFactory` (not `DefaultValue`) and passes aliases as an array in the constructor (not `.AddAlias()`). Parses option strings into typed values via `OptionParsing` before constructing `BorderOptions`, then drives the main loop with `Parallel.ForEach` (`--parallel`, default = `Environment.ProcessorCount`); counters use `Interlocked` and console writes are guarded by a lock.
+**`Cli/Cli.cs`** — `Cli.Build()` constructs the `RootCommand` (all options + the `SetAction` handler) and `Cli.RunAsync(args)` parses and invokes it, returning the exit code. Kept separate from `Program.cs` so tests can drive the whole CLI in-process. Parses option strings into typed values via `OptionParsing`, validates, constructs `BorderOptions`, then drives the main loop with `Parallel.ForEach` (`--parallel`; `0` = `Environment.ProcessorCount`); counters use `Interlocked` and console writes are guarded by a lock.
 
-**`Cli/OptionParsing.cs`** — `public static` helpers that turn CLI strings into typed values: `ParseStyle`, `ParseColor`, `ParseSize` (pixels vs percentage), `ParseAspect` (`W:H`). Public so the test project can exercise them directly.
+**`Cli/OptionParsing.cs`** — `public static` helpers that turn CLI strings into typed values: `ParseStyle`, `ParseColor`, `ParseSize` (pixels vs percentage), `ParseAspect` (`W:H`).
 
-**`Processing/InputResolver.cs`** — Converts the `input` argument into a flat list of file paths. Handles three modes: directory enumeration, glob (`*`/`?`), and single file. Filters to supported extensions and skips files whose names already end with the configured suffix (prevents double-bordering).
+**`Processing/InputResolver.cs`** — Converts the `input` argument into a flat list of file paths: directory enumeration, glob (`*`/`?`), or single file. Filters to supported extensions and skips files whose names already end with the configured suffix.
 
-**`Processing/BorderProcessor.cs`** — Core image logic using SkiaSharp. `ComputeBorders` (public, pure — unit-tested) resolves pixel vs percentage sizes (percentage is relative to the shorter dimension) and applies Uniform / Polaroid / Aspect proportions. Aspect pads centered to a target ratio with a minimum margin. Draws by filling a new canvas with the border color then blitting the original at an offset. Output format is inferred from the source extension; quality only applies to JPEG/WebP.
+**`Processing/BorderProcessor.cs`** — Core image logic using SkiaSharp. `ComputeBorders` (public, pure) resolves pixel vs percentage sizes and applies Uniform / Polaroid / Aspect proportions. Draws by filling a new canvas with the border color then blitting the original at an offset. Output format is inferred from the source extension; quality only applies to JPEG/WebP.
 
-**`Models/`** — `BorderOptions` is a positional record threaded through the pipeline. `BorderStyle` is a three-value enum (`Uniform`, `Polaroid`, `Aspect`). Both are `public` so tests can construct/inspect them.
+**`Models/`** — `BorderOptions` is a positional record threaded through the pipeline. `BorderStyle` is a three-value enum (`Uniform`, `Polaroid`, `Aspect`).
+
+## Library constraints
+
+- **SkiaSharp, not ImageSharp.** ImageSharp v4 requires a paid license key at build time, so it was rejected — don't suggest switching.
+- **System.CommandLine 3.x (preview), not 2.x.** The API differs from most online examples:
+  - `new Option<T>("--name", ["-n"])` — aliases as an array in the constructor, not `.AddAlias()`
+  - `option.DefaultValueFactory = _ => value` (not `DefaultValue`); `option.Description = "..."`
+  - `rootCommand.SetAction((ParseResult result) => { ... })` — not `SetHandler`
+  - Read values with `result.GetValue(option)`; run with `rootCommand.Parse(args).InvokeAsync()`
+
+## Adding a CLI option
+
+A new option touches several places — update all of them:
+
+1. `Cli/Cli.cs` — declare the option, add it to the `RootCommand`, read it in `SetAction`, and validate it there (throw `ArgumentException` → `Error:` message, exit 1).
+2. `Cli/OptionParsing.cs` — add a `Parse*` helper if the string needs converting to a typed value.
+3. `Models/BorderOptions.cs` — add a field if `BorderProcessor` needs it.
+4. `README.md` — add a row to the Options table (and a Notes entry for any caveat).
+5. Tests — `OptionParsingTests` for parsing, `CliTests` for end-to-end behavior and validation errors.
 
 ## Key behaviors to preserve
 
@@ -62,5 +77,5 @@ Source is organized into folders, all sharing the flat `Borderize` namespace exc
 - Aspect pads centered to `--aspect` (`W:H`) with `--size` as the minimum margin; never shrinks below that margin.
 - EXIF orientation is applied on decode via `BorderProcessor.OrientUpright` (SkiaSharp's decoders ignore it) — keep the `SKCodec.EncodedOrigin`-based decode so camera photos aren't bordered sideways.
 - Already-bordered files are detected by suffix match on the filename stem (case-insensitive), not by metadata.
-- Output is written alongside the original (`dir/stem + suffix + ext`); the original is never modified.
-- `Program.cs` builds output paths via `BorderProcessor.BuildOutputPath` — keep that the single source of the naming rule (don't re-inline it).
+- Output is `stem + suffix + ext`, written alongside the original by default or into `--output-dir` if given; the original is never modified. `--output-dir` flattens output, so with `--recursive` same-named files from different subfolders overwrite each other.
+- `BorderProcessor.BuildOutputPath` is the single source of the naming rule — `Cli.cs` (dry-run/verbose output) and `BorderProcessor.Process` both call it; don't re-inline it.

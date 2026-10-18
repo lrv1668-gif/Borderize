@@ -3,3 +3,4 @@ obj/
 nupkg/
 *.user
 .DS_Store
+.claude/settings.local.json
