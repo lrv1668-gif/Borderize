@@ -28,7 +28,7 @@ Always use `./install-local.sh` to install a local build — never bare `dotnet 
 
 ## Tests
 
-Tests live in `Borderize.Tests/` (xUnit), one file per component plus `CliTests` for the full CLI end-to-end. Rules that aren't obvious from reading them:
+Tests live in `Borderize.Tests/` (xUnit v3, run by Microsoft.Testing.Platform — opted into via `global.json`, so `dotnet test` takes MTP-style args like `--solution` / `--output Detailed`, not VSTest's), one file per component plus `CliTests` for the full CLI end-to-end. Rules that aren't obvious from reading them:
 
 - `CliTests` drive the real command in-process via `Cli.RunAsync(args)` and redirect the process-global `Console.Out`/`Error`, so they must stay in the non-parallel `[Collection("CLI")]`.
 - EXIF-orientation fixtures are synthesized in-process with `ExifLibNet` (a test-only NuGet dep) — keep it that way; don't shell out to exiftool/ImageMagick, which aren't in the container.
@@ -38,6 +38,8 @@ CI builds and tests inside Docker on every push/PR: the multi-stage `Dockerfile`
 ## Architecture
 
 The pipeline is: **Cli/Cli.cs** parses CLI args → **Processing/InputResolver.cs** resolves them to a file list → **Processing/BorderProcessor.cs** transforms each file. **Program.cs** (project root) is a one-line entry point (`return await Borderize.Cli.RunAsync(args);`).
+
+Shared build settings (target framework, nullable, analyzers) live in `Directory.Build.props`, which also sets `TreatWarningsAsErrors` with `AnalysisLevel=latest-recommended` — an analyzer warning fails the build. NuGet versions are centrally managed in `Directory.Packages.props`; `<PackageReference>`s carry no `Version`. If you add a root-level build file needed by restore, add it to the Dockerfile's first `COPY` too.
 
 Source is organized into folders, all sharing the flat `Borderize` namespace except `Models/` (`Borderize.Models`); folders are organizational only and the `.csproj` globs `**/*.cs`, so adding/moving files needs no project edits.
 
@@ -54,7 +56,7 @@ Source is organized into folders, all sharing the flat `Borderize` namespace exc
 ## Library constraints
 
 - **SkiaSharp, not ImageSharp.** ImageSharp v4 requires a paid license key at build time, so it was rejected — don't suggest switching.
-- **System.CommandLine 3.x (preview), not 2.x.** The API differs from most online examples:
+- **System.CommandLine 2.0 (stable).** Its API differs from most online examples, which target the old `2.0.0-beta` previews:
   - `new Option<T>("--name", ["-n"])` — aliases as an array in the constructor, not `.AddAlias()`
   - `option.DefaultValueFactory = _ => value` (not `DefaultValue`); `option.Description = "..."`
   - `rootCommand.SetAction((ParseResult result) => { ... })` — not `SetHandler`

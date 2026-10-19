@@ -181,7 +181,7 @@ public static class Cli
             }
 
             int processed = 0, skipped = 0;
-            var consoleLock = new object();
+            Lock consoleLock = new();
 
             var parallelOptions = new ParallelOptions
             {

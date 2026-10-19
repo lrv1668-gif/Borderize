@@ -6,7 +6,7 @@ WORKDIR /src
 
 # Copy only project/solution files first so `restore` is its own cached layer
 # (re-used across builds whenever no .csproj/.slnx changed).
-COPY Borderize.slnx Borderize.csproj ./
+COPY Borderize.slnx Borderize.csproj Directory.Build.props Directory.Packages.props global.json ./
 COPY Borderize.Tests/Borderize.Tests.csproj Borderize.Tests/
 RUN dotnet restore Borderize.slnx
 
@@ -16,4 +16,4 @@ RUN dotnet build Borderize.slnx -c Release --no-restore
 
 # Test stage: run the xUnit suite. A failing test fails `docker build`, gating CI.
 FROM build AS test
-RUN dotnet test Borderize.slnx -c Release --no-restore --verbosity normal
+RUN dotnet test --solution Borderize.slnx -c Release --no-build --output Detailed

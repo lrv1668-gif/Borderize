@@ -227,6 +227,18 @@ public class CliTests : IDisposable
     }
 
     [Fact]
+    public void InvalidHexColor_ExitsOne_WithError()
+    {
+        var path = CreateImage("photo.jpg", 40, 40, SKEncodedImageFormat.Jpeg);
+
+        var (exit, _, stderr) = Run(path, "--color", "#GGGGGG");
+
+        Assert.Equal(1, exit);
+        Assert.Contains("Error: Hex color must be 6 hex digits", stderr);
+        Assert.False(File.Exists(Output(path)));
+    }
+
+    [Fact]
     public void NonexistentInput_ExitsOne_WithError()
     {
         var missing = Path.Combine(_tempDir, "does-not-exist.jpg");

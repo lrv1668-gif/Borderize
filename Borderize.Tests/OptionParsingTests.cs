@@ -1,3 +1,4 @@
+using System.Globalization;
 using Borderize;
 using Borderize.Models;
 using SkiaSharp;
@@ -39,16 +40,35 @@ public class OptionParsingTests
     [Theory]
     [InlineData("#FFF")]
     [InlineData("#GGGGGG")]
+    [InlineData("##FFFFF")]
+    [InlineData("#+1FFFF")]
     [InlineData("turquoise")]
     public void ParseColor_Throws_OnInvalid(string input)
     {
-        Assert.ThrowsAny<Exception>(() => OptionParsing.ParseColor(input));
+        // Must be ArgumentException specifically: that's what the CLI turns into "Error: ...".
+        Assert.Throws<ArgumentException>(() => OptionParsing.ParseColor(input));
     }
 
     [Fact]
     public void ParseSize_Percentage_IsRelativeToReferenceDimension()
     {
         Assert.Equal(40, OptionParsing.ParseSize("5%", 800));
+    }
+
+    [Fact]
+    public void ParseSize_FractionalPercentage_IsCultureInvariant()
+    {
+        // de-DE uses ',' as the decimal separator; "2.5%" must still mean 2.5%, not 25%.
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+            Assert.Equal(20, OptionParsing.ParseSize("2.5%", 800));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     [Fact]

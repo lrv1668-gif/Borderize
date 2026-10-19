@@ -2,7 +2,7 @@ using SkiaSharp;
 
 namespace Borderize.Models;
 
-public record BorderOptions(
+public sealed record BorderOptions(
     BorderStyle Style,
     string Size,
     string? Bottom,

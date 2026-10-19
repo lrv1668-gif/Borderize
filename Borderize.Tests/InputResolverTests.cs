@@ -27,8 +27,8 @@ public class InputResolverTests : IDisposable
         var result = InputResolver.Resolve(_tempDir, recursive: false, suffix: "-border").ToList();
 
         Assert.Equal(3, result.Count);
-        Assert.DoesNotContain(result, f => f.EndsWith(".gif"));
-        Assert.DoesNotContain(result, f => f.EndsWith(".bmp"));
+        Assert.DoesNotContain(result, f => f.EndsWith(".gif", StringComparison.Ordinal));
+        Assert.DoesNotContain(result, f => f.EndsWith(".bmp", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class InputResolverTests : IDisposable
         var result = InputResolver.Resolve(Path.Combine(_tempDir, "*.jpg"), recursive: false, suffix: "-border").ToList();
 
         Assert.Equal(2, result.Count);
-        Assert.DoesNotContain(result, f => f.EndsWith(".gif"));
+        Assert.DoesNotContain(result, f => f.EndsWith(".gif", StringComparison.Ordinal));
     }
 
     [Fact]
